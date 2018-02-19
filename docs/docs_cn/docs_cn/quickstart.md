@@ -1,11 +1,10 @@
 # Quickstart
 
-This 10-minute guide will show you how to run an entire Hermes environment, create topic and subscription and
-publish some messages.
+这份10分钟的指南将向您展示如何运行整个爱马仕环境，创建话题和订阅以及发布一些消息。
 
 ## Prerequisities
 
-In order to go through this tutorial you need to have:
+为了阅读本教程，您需要：:
 
 * [Vagrant 1.7.3+](https://www.vagrantup.com/)
 * [VirtualBox](https://www.virtualbox.org/) (4.0.x, 4.1.x, 4.2.x, 4.3.x, 5.0.x)
@@ -14,60 +13,55 @@ In order to go through this tutorial you need to have:
 
 ## Setting up an environment
 
-As described in [architecture](/overview/architecture) section, Hermes consists of multiple modules and requires Kafka
-and Zookeeper to run. To make this easy, we prepared a Vagrant file.
+如[体系结构]（/概述/体系结构）部分所述，爱马仕包含多个模块，并要求运行Kafka和Zookeeper。 为了简单起见，我们准备了一个Vagrant文件。
 
-```bash
+bash
 git clone https://github.com/allegro/hermes.git
 cd hermes
 vagrant up
 ```
 
-If you want to run specific version of Hermes, simply checkout a tag:
+如果你想运行特定版本的爱马仕，只需签出一个标签：
 
 ```bash
 git checkout hermes-{version}
 ```
 
-## Checking the setup
+## 检查设置
 
-If the system is running, you should see Hermes Console when visiting Vagrant public IP in the browser. Just head to
-[http://10.10.10.10/](http://10.10.10.10/).
+如果系统正在运行，则在浏览器中访问Vagrant公共IP时应该看到爱马仕控制台。 参阅[http://10.10.10.10/](http://10.10.10.10/).
 
 ## Creating group and topic
 
-Now you're ready to create a **topic** for publishing messages.
+现在您已准备好创建**主题**来发布消息。
 
-In Hermes messages are published on topics which are aggregated into **groups**.
-So, you'll need to create a group first, let's name it `com.example.events`.
+在爱马仕的信息发布在聚合成**组**的主题上。因此，您需要先创建一个组，然后将其命名为“com.example.events”。
 
-* head to [Hermes Console](http://10.10.10.10/#/groups)
-* click the blue plus button
-* enter group name: `com.example.events`
-* all the other information is required, but just enter whatever for now
+* 打开 [Hermes Console](http://10.10.10.10/#/groups)
+* 点击蓝色加号按钮
+* 输入组名称：`com.example.events`
+* 所有其他信息是必需的，但现在只需输入任何内容
 
-At this point, you should see your group on the group list. Now let's add new `clicks` topic to our group:
+此时，您应该在组列表中看到您的组。 现在，让我们为我们的小组添加新的“点击”主题：
 
-* click the group header ([direct link to com.example.events group](http://10.10.10.10/#/groups/com.example.events))
-* click the blue plus button
-* enter topic name: `clicks`
-* enter some description
-* change content type to JSON - we don't want to add AVRO schema yet for the sake of simplicity
+* 点击群组标题（[直接链接到com.example.events群组]（http://10.10.10.10/#/groups/com.example.events））
+* 点击蓝色加号按钮
+* 输入主题名称：`点击`
+* 输入一些说明
+* 将内容类型更改为JSON - 为简单起见，我们不想添加AVRO架构
 
-## Publishing and receiving messages
+## 发布和接收消息
+要接收发布在主题上的消息，您必须创建**订阅**。 这是你告诉爱马仕在哪里发送关于主题发布的消息的地方。 您可以在单个主题上进行多次订阅（特别是 - none）
 
-To receive messages that are published on topic you have to create a **subscription**. This is where you tell Hermes
-where to send messages published on a topic. You can have many subscriptions on a single topic (in particular - none).
+所以我们来创建一个`clicks-receiver`订阅：
 
-So let's create a `clicks-receiver` subscription:
+* 点击主题标题（[直接链接到com.example.events.clicks组]（http://10.10.10.10/#/groups/com.example.events/topics/com.example.events.clicks））
+* 点击蓝色加号按钮
+* 输入订阅名称：`clicks-receiver`
+* 设置消息将被发送到的端点，在这个例子中，我们可以使用http：// requestb.in / 1isy54g1`
+* 输入一些描述和联系人数据
 
-* click the topic header ([direct link to com.example.events.clicks group](http://10.10.10.10/#/groups/com.example.events/topics/com.example.events.clicks))
-* click the blue plus button
-* enter subscription name: `clicks-receiver`
-* set the endpoint to which messages will be sent, in this example we can use `http://requestb.in/1isy54g1`
-* enter some description and contact data
-
-Now it's time for a grand finale. Let's publish a message on our topic (note that default Hermes publishing port is `8080`):
+现在是时候举行盛大的结局。 让我们在我们的主题上发布消息（请注意，默认的Hermes发布端口是`8080`）：
 
 ```bash
 curl -v -d '{"id": 12345, "page": "main"}' http://10.10.10.10:8080/topics/com.example.events.clicks
@@ -78,26 +72,23 @@ curl -v -d '{"id": 12345, "page": "main"}' http://10.10.10.10:8080/topics/com.ex
 < Date: Mon, 04 May 2015 02:18:23 GMT
 ```
 
-(the first time you publish something you might see 408 Request Time-out status: a lot of machinery needs to warm up,
-just hit retry)
+（第一次发布您可能会看到的内容408请求超时状态：许多机器需要预热，只需重试）
 
-Congratulations! The message should be delivered to your service or visible via e.g. `http://requestb.in/1isy54g1?inspect`.
+恭喜！ 该消息应该传递给您的服务或通过例如通过`http：//requestb.in/1isy54g1 inspect`## 来停止系统
 
-## Stopping the system
-
-To stop the virtual machine run:
+停止虚拟机运行：
 
 ```bash
 vagrant halt
 ```
 
-Run it again with:
+再次运行它:
 
 ```bash
 vagrant up
 ```
 
-Destroy the VM with:
+用以下方式销毁VM：
 
 ```bash
 vagrant destroy

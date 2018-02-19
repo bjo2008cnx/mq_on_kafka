@@ -30,8 +30,7 @@ public class KafkaTopic {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         KafkaTopic that = (KafkaTopic) o;
-        return Objects.equals(name, that.name) &&
-                Objects.equals(contentType, that.contentType);
+        return Objects.equals(name, that.name) && Objects.equals(contentType, that.contentType);
     }
 
     @Override
@@ -41,9 +40,6 @@ public class KafkaTopic {
 
     @Override
     public String toString() {
-        return MoreObjects.toStringHelper(this)
-                .add("name", name)
-                .add("contentType", contentType)
-                .toString();
+        return MoreObjects.toStringHelper(this).add("name", name).add("contentType", contentType).toString();
     }
 }
