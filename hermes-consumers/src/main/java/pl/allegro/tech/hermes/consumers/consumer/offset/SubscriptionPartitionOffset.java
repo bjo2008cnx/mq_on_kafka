@@ -20,10 +20,7 @@ public class SubscriptionPartitionOffset {
     }
 
     public static SubscriptionPartitionOffset subscriptionPartitionOffset(String kafkaTopicName, String subscriptionName, int partition, long offset) {
-        return new SubscriptionPartitionOffset(
-                SubscriptionPartition.subscriptionPartition(kafkaTopicName, subscriptionName, partition),
-                offset
-        );
+        return new SubscriptionPartitionOffset(SubscriptionPartition.subscriptionPartition(kafkaTopicName, subscriptionName, partition), offset);
     }
 
     public static SubscriptionPartitionOffset subscriptionPartitionOffset(Message message, Subscription subscription) {
@@ -31,25 +28,13 @@ public class SubscriptionPartitionOffset {
     }
 
     public static SubscriptionPartitionOffset subscriptionPartitionOffset(PartitionOffset partitionOffset, Subscription subscription) {
-        return new SubscriptionPartitionOffset(
-                new SubscriptionPartition(
-                        partitionOffset.getTopic(),
-                        subscription.getQualifiedName(),
-                        partitionOffset.getPartition()
-                ),
-                partitionOffset.getOffset()
-        );
+        return new SubscriptionPartitionOffset(new SubscriptionPartition(partitionOffset.getTopic(), subscription.getQualifiedName(), partitionOffset
+                .getPartition()), partitionOffset.getOffset());
     }
 
     public static SubscriptionPartitionOffset subscriptionPartitionOffset(PartitionOffset partitionOffset, SubscriptionName subscription) {
-        return new SubscriptionPartitionOffset(
-                new SubscriptionPartition(
-                        partitionOffset.getTopic(),
-                        subscription,
-                        partitionOffset.getPartition()
-                ),
-                partitionOffset.getOffset()
-        );
+        return new SubscriptionPartitionOffset(new SubscriptionPartition(partitionOffset.getTopic(), subscription, partitionOffset.getPartition()),
+                partitionOffset.getOffset());
     }
 
     public SubscriptionName getSubscriptionName() {
@@ -77,8 +62,7 @@ public class SubscriptionPartitionOffset {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         SubscriptionPartitionOffset that = (SubscriptionPartitionOffset) o;
-        return offset == that.offset &&
-                Objects.equals(subscriptionPartition, that.subscriptionPartition);
+        return offset == that.offset && Objects.equals(subscriptionPartition, that.subscriptionPartition);
     }
 
     @Override
@@ -88,9 +72,6 @@ public class SubscriptionPartitionOffset {
 
     @Override
     public String toString() {
-        return "SubscriptionPartitionOffset{" +
-                "subscriptionPartition=" + subscriptionPartition +
-                ", offset=" + offset +
-                '}';
+        return "SubscriptionPartitionOffset{" + "subscriptionPartition=" + subscriptionPartition + ", offset=" + offset + '}';
     }
 }

@@ -2,7 +2,6 @@ package pl.allegro.tech.hermes.consumers.consumer.offset;
 
 import com.codahale.metrics.Timer;
 import com.google.common.collect.Sets;
-import org.jctools.queues.MessagePassingQueue;
 import org.jctools.queues.MpscArrayQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +9,6 @@ import pl.allegro.tech.hermes.api.SubscriptionName;
 import pl.allegro.tech.hermes.common.metric.HermesMetrics;
 import pl.allegro.tech.hermes.consumers.consumer.receiver.MessageCommitter;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -18,47 +16,30 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
 /**
- * Note on algorithm used to calculate offsets to actually commit.
+ * 关于用于计算偏移量以实际提交的算法的注意事项。
+ * 这个算法背后的想法是，我们想提交：标记为已提交的但不大于最小的机上偏移（最小机上偏移 - 1）
+ * 重要的提示！这个类是Kafka OffsetCommiter，所以它以Kafka的方式感知偏移量。
+ * 最重要的是在消费者重新启动时读取的第一个偏移标记消息 * (Most importantly committed offset marks message that is read as first on Consumer restart)
+ * （偏移量包括读取和排他写）。
  * <p>
- * The idea behind this algorithm is that we would like to commit:
- * * maximal offset marked as committed
- * * but not larger than smallest inflight offset (smallest inflight - 1)
+ * 消费者使用两个队列来报告消息状态：
+ * * inflightOffsets：当前正在发送的消息偏移（机上）
+ * * committedOffsets：准备好提交的消息偏移量
  * <p>
- * Important note! This class is Kafka OffsetCommiter, and so it perceives offsets in Kafka way. Most importantly
- * committed offset marks message that is read as first on Consumer restart (offset is inclusive for reading and
- * exclusive for writing).
+ * 此提交者类以inflightOffsets和failedToCommitOffsets集的形式保存内部状态。
+ * inlfightOffsets是当前处于飞行状态的所有偏移量。
+ * failedToCommitOffsets是在之前的算法迭代中无法提交的偏移量
  * <p>
- * There are two queues which are used by Consumers to report message state:
- * * inflightOffsets: message offsets that are currently being sent (inflight)
- * * committedOffsets: message offsets that are ready to get committed
- * <p>
- * This committer class holds internal state in form of inflightOffsets and failedToCommitOffsets set.
- * inlfightOffsets are all offsets that are currently in inflight state.
- * failedToCommitOffsets are offsets that could not be committed in previous algorithm iteration
- * <p>
- * In scheduled periods, commit algorithm is run. It has three phases. First one is draining the queues and performing
- * reductions:
- * * drain committedOffsets queue to collection - it needs to be done before draining inflights, so this collection
- * will not grow anymore, resulting in having inflights unmatched by commits; commits are incremented by 1 to match
- * Kafka commit definition
- * * add all previously uncommitted offsets from failedToCommitOffsets collection to committedOffsets and clear
- * failedToCommitOffsets collection
- * * drain inflightOffset
- * <p>
- * Second phase is calculating the offsets:
- * <p>
- * * calculate maximal committed offset for each subscription & partition
- * * calculate minimal inflight offset for each subscription & partition
- * <p>
- * Third phase is choosing which offset to commit for each subscription/partition. This is the minimal value of
+ * 在预定时间段内，提交算法运行。它有三个阶段。
+ * 第一阶段：加入队列并进行递减：提交+1以匹配Kafka提交定义将所有先前未提交的偏移从failedToCommitOffsets集合添加到committedOffsets并清除failedToCommitOffsets集合drain inflightOffset
+ * 第二阶段是计算偏移： 计算每个订阅和分区的最大承诺偏移量; 为每个订阅和分区计算最小的机上偏移量
+ * 第三阶段是选择为每个订阅/分区提交哪个偏移量。它是以下两项中的最小值
  * * maximum committed offset
  * * minimum inflight offset
  * <p>
- * This algorithm is very simple, memory efficient, can be performed in single thread and introduces no locks.
+ * 该算法非常简单，内存高效，可以在单线程中执行并且不引入锁。
  */
 public class OffsetCommitter implements Runnable {
 
@@ -66,24 +47,32 @@ public class OffsetCommitter implements Runnable {
 
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
 
+    /**
+     * 提交时间间隔
+     */
     private final int offsetCommitPeriodSeconds;
 
+    /**
+     * 待提交的队列？
+     */
     private final OffsetQueue offsetQueue;
+
 
     private final MessageCommitter messageCommitter;
 
     private final HermesMetrics metrics;
 
+    /**
+     * 当前正在发送的消息偏移（已发送未确认的偏移）
+     */
     private final Set<SubscriptionPartitionOffset> inflightOffsets = new HashSet<>();
 
+    /**
+     *
+     */
     private final MpscArrayQueue<SubscriptionName> subscriptionsToCleanup = new MpscArrayQueue<>(1000);
 
-    public OffsetCommitter(
-            OffsetQueue offsetQueue,
-            MessageCommitter messageCommitter,
-            int offsetCommitPeriodSeconds,
-            HermesMetrics metrics
-    ) {
+    public OffsetCommitter(OffsetQueue offsetQueue, MessageCommitter messageCommitter, int offsetCommitPeriodSeconds, HermesMetrics metrics) {
         this.offsetQueue = offsetQueue;
         this.messageCommitter = messageCommitter;
         this.offsetCommitPeriodSeconds = offsetCommitPeriodSeconds;
@@ -93,8 +82,9 @@ public class OffsetCommitter implements Runnable {
     @Override
     public void run() {
         try (Timer.Context c = metrics.timer("offset-committer.duration").time()) {
-            // committed offsets need to be drained first so that there is no possibility of new committed offsets
-            // showing up after inflight queue is drained - this would lead to stall in committing offsets
+            //已提交的偏移量需要首先排空，这样在飞行队列排空后不会出现新的已提交偏移量 - 这会导致已提交偏移停止
+            // committed offsets need to be drained first so that there is no possibility of new committed offsets showing up after inflight queue is drained -
+            // this would lead to stall in committing offsets
             ReducingConsumer committedOffsetsReducer = processCommittedOffsets();
             Map<SubscriptionPartition, Long> maxCommittedOffsets = committedOffsetsReducer.reduced;
 
@@ -104,10 +94,7 @@ public class OffsetCommitter implements Runnable {
             int scheduledToCommit = 0;
             OffsetsToCommit offsetsToCommit = new OffsetsToCommit();
             for (SubscriptionPartition partition : Sets.union(minInflightOffsets.keySet(), maxCommittedOffsets.keySet())) {
-                long offset = Math.min(
-                        minInflightOffsets.getOrDefault(partition, Long.MAX_VALUE),
-                        maxCommittedOffsets.getOrDefault(partition, Long.MAX_VALUE)
-                );
+                long offset = Math.min(minInflightOffsets.getOrDefault(partition, Long.MAX_VALUE), maxCommittedOffsets.getOrDefault(partition, Long.MAX_VALUE));
                 if (offset >= 0 && offset < Long.MAX_VALUE) {
                     scheduledToCommit++;
                     offsetsToCommit.add(new SubscriptionPartitionOffset(partition, offset));
@@ -115,7 +102,6 @@ public class OffsetCommitter implements Runnable {
             }
 
             messageCommitter.commitOffsets(offsetsToCommit);
-
             metrics.counter("offset-committer.committed").inc(scheduledToCommit);
 
             cleanupUnusedSubscriptions();
@@ -124,6 +110,10 @@ public class OffsetCommitter implements Runnable {
         }
     }
 
+    /**
+     *
+     * @return
+     */
     private ReducingConsumer processCommittedOffsets() {
         ReducingConsumer committedOffsetsReducer = new ReducingConsumer(Math::max, c -> c + 1);
         offsetQueue.drainCommittedOffsets(committedOffsetsReducer);
@@ -131,6 +121,11 @@ public class OffsetCommitter implements Runnable {
         return committedOffsetsReducer;
     }
 
+    /**
+     *
+     * @param committedOffsets
+     * @return
+     */
     private ReducingConsumer processInflightOffsets(Set<SubscriptionPartitionOffset> committedOffsets) {
         ReducingConsumer inflightOffsetReducer = new ReducingConsumer(Math::min);
         offsetQueue.drainInflightOffsets(o -> reduceIfNotCommitted(o, inflightOffsetReducer, committedOffsets));
@@ -142,18 +137,30 @@ public class OffsetCommitter implements Runnable {
         return inflightOffsetReducer;
     }
 
-    private void reduceIfNotCommitted(SubscriptionPartitionOffset offset,
-                                      ReducingConsumer inflightOffsetReducer,
-                                      Set<SubscriptionPartitionOffset> committedOffsets) {
+    /**
+     *
+     * @param offset
+     * @param inflightOffsetReducer
+     * @param committedOffsets
+     */
+    private void reduceIfNotCommitted(SubscriptionPartitionOffset offset, ReducingConsumer inflightOffsetReducer, Set<SubscriptionPartitionOffset>
+            committedOffsets) {
         if (!committedOffsets.contains(offset)) {
             inflightOffsetReducer.accept(offset);
         }
     }
 
+    /**
+     *
+     * @param subscriptionName
+     */
     public void removeUncommittedOffsets(SubscriptionName subscriptionName) {
         subscriptionsToCleanup.offer(subscriptionName);
     }
 
+    /**
+     *
+     */
     private void cleanupUnusedSubscriptions() {
         Set<SubscriptionName> subscriptionNames = new HashSet<>();
         subscriptionsToCleanup.drain(subscriptionNames::add);
@@ -164,47 +171,17 @@ public class OffsetCommitter implements Runnable {
         }
     }
 
+    /**
+     *
+     */
     public void start() {
-        scheduledExecutor.scheduleWithFixedDelay(this,
-                offsetCommitPeriodSeconds,
-                offsetCommitPeriodSeconds,
-                TimeUnit.SECONDS
-        );
+        scheduledExecutor.scheduleWithFixedDelay(this, offsetCommitPeriodSeconds, offsetCommitPeriodSeconds, TimeUnit.SECONDS);
     }
 
+    /**
+     *
+     */
     public void shutdown() {
         scheduledExecutor.shutdown();
-    }
-
-    private static final class ReducingConsumer implements MessagePassingQueue.Consumer<SubscriptionPartitionOffset> {
-        private final BiFunction<Long, Long, Long> reductor;
-        private Function<Long, Long> modifier;
-        private final Map<SubscriptionPartition, Long> reduced = new HashMap<>();
-        private final Set<SubscriptionPartitionOffset> all = new HashSet<>();
-
-        private ReducingConsumer(BiFunction<Long, Long, Long> reductor, Function<Long, Long> offsetModifier) {
-            this.reductor = reductor;
-            this.modifier = offsetModifier;
-        }
-
-        private ReducingConsumer(BiFunction<Long, Long, Long> reductor) {
-            this(reductor, Function.identity());
-        }
-
-        private void resetModifierFunction() {
-            this.modifier = Function.identity();
-        }
-
-        @Override
-        public void accept(SubscriptionPartitionOffset p) {
-            all.add(p);
-            reduced.compute(
-                    p.getSubscriptionPartition(),
-                    (k, v) -> {
-                        long offset = modifier.apply(p.getOffset());
-                        return v == null ? offset : reductor.apply(v, offset);
-                    }
-            );
-        }
     }
 }
