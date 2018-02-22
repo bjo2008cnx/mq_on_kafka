@@ -1,6 +1,6 @@
 # Deployment
 
-This section covers basic operational aspects of deploying Hermes. For more on configuring Hermes read:
+本节介绍部署爱马仕的基本操作方面。 有关配置Hermes的更多信息，请阅读：
 
 * [how to connect to Kafka and Zookeeper](/configuration/kafka-and-zookeeper)
 * [how to fine tune Frontend](/configuration/frontend-tuning)
@@ -16,28 +16,26 @@ Hermes:
 * **Kafka**
 * **Zookeeper**
 
-In our opinion it is best practice, to run them on separate hosts, so Hermes does not affect them.
+在我们看来，最好的做法是在不同的主机上运行它们，所以爱马仕不会影响它们。
 
 ## Scalability
 
-Each module is a stateless application. There can be as many of them running in parallel as it is required. For best
-performance and easy maintenance, each Hermes module should also be deployed on separate host.
+每个模块都是无状态的应用程序。 根据需要，可以有多个并行运行。 为了最好性能和维护方便，每个爱马仕模块还应该部署在单独的主机上。
 
 ## Requirements
 
-All Hermes Java modules require **Java 8** to work. Hermes Console has no external dependencies.
+所有Hermes Java模块都需要** Java 8 **才能工作。 爱马仕控制台没有外部依赖。
 
 ## Passing environment variables
-
-All Java modules share the same bundling strategy: Gradle distZips. In order to pass any command line options to
-executables use:
+所有Java模块共享相同的捆绑策略：Gradle distZips。 为了将任何命令行选项传递给可执行文件，请使用：
 
 * `HERMES_<module name>_OPTS` for application options
 * `JAVA_OPTS` for Java specific options
 
 for example:
 
-```bash
+```
+bash
 export HERMES_FRONTEND_OPTS="-Dfrontend.port=8090"
 export JAVA_OPTS="-Xmx2g"
 ```
@@ -46,22 +44,23 @@ export JAVA_OPTS="-Xmx2g"
 
 ### External configuration
 
-Hermes Frontend and Consumers modules use [Netflix Archaius](https://github.com/Netflix/archaius/) to manage configuration.
+爱马仕前端和消费者模块使用[Netflix Archaius]（https://github.com/Netflix/archaius/）来管理配置。
+要从任何URL（本地文件或远程HTTP源）读取外部配置，请在系统属性中指定其位置：
 
-To read external configuration from any URL (local file or remote HTTP source), specify its location in system property:
-
-```bash
+```
+bash
 export HERMES_FRONTEND_OPTS="-Darchaius.configurationSource.additionalUrls=file:///opt/hermes/conf/frontend.properties"
 export HERMES_CONSUMERS_OPTS="-Darchaius.configurationSource.additionalUrls=file:///opt/hermes/conf/consumers.properties"
 ```
 
-Configuration is stored in Java properties format.
+配置以Java属性格式存储。
 
 ### Overwriting configuration using ENV
 
-It is possible to overwrite any configuration variable using environment variable:
+可以使用环境变量覆盖任何配置变量：
 
-```bash
+```
+bash
 export HERMES_FRONTEND_OPTS="-D<configuration-option>=<value>"
 ```
 
@@ -73,7 +72,7 @@ export HERMES_FRONTEND_OPTS="-Dfrontend.port=8090 -Dfrontend.idle.timeout=30"
 
 ### Java options
 
-It is advised to run Hermes Frontend and Consumers with G1 garbage collector and at least 1GB heap:
+建议使用G1垃圾收集器运行爱马仕前端和消费者，至少1GB堆：
 
 ```
 -XX:+UseG1GC -Xms1g
@@ -83,8 +82,7 @@ It is advised to run Hermes Frontend and Consumers with G1 garbage collector and
 
 ### External configuration
 
-Management being Spring Boot application, shares the same options to provide additional configuration. The most basic way
-to provide external configuration file is to export an environment variable:
+管理是Spring Boot应用程序，共享相同的选项以提供额外的配置。 提供外部配置文件的最基本的方法是导出一个环境变量：
 
 ```
 SPRING_CONFIG_LOCATION="file:///opt/hermes/conf/management.properties"
@@ -92,25 +90,27 @@ SPRING_CONFIG_LOCATION="file:///opt/hermes/conf/management.properties"
 
 ### Overwriting configuration using ENV
 
-```bash
+```
+bash
 export HERMES_MANAGEMENT_OPTS="-D<configuration-option>=<value>"
 ```
 
-```bash
+```
+bash
 export HERMES_MANAGEMENT_OPTS="-Dserver.port=8070"
 ```
 
 ## Console
 
-Hermes Console is a simple Single Page Application served using NodeJS. It accepts two arguments:
+爱马仕控制台是一个使用NodeJS服务的简单单页面应用程序。 它接受两个参数：
 
-* `-p` or `HERMES_CONSOLE_PORT` env variable to specify port (default: 8000)
-* `-c` or `HERMES_CONSOLE_CONFIG` env variable to specify configuration file (default: `./config.json`)
+* `-p`或`HERMES_CONSOLE_PORT` env变量来指定端口（默认值：8000）
+* `-c`或`HERMES_CONSOLE_CONFIG` env变量来指定配置文件（默认值：`./config.json`）
 
-The `config.json` file is mandatory, Hermes Console will crash when unable to read it. See
-[configuring Hermes Console](/configuration/console) section for more information.
+`config.json`文件是强制性的，Hermes控制台在无法读取时会崩溃。
+See [configuring Hermes Console](/configuration/console) （/配置/控制台）部分。
 
-Hermes Console has no dependencies and will run out of box on Linux machines. To run it, use provided script:
+Hermes控制台没有依赖关系，并且在Linux机器上运行在容器之外。 要运行它，请使用提供的脚本：
 
 ```
 ./run.sh -p 8000 -c /etc/hermes-console/config.json

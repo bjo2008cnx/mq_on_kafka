@@ -1,35 +1,35 @@
 # Java Client
 
-A thin library designed to publish messages to Hermes.
+一个精简的类库，旨在向爱马仕发布消息。
 
-## Features
+##特征
 
-* http client-agnostic API
-* synchronous/asynchronous publishing
-* configurable retries
-* metrics
+* http客户端不可知的API
+*同步/异步发布
+*可配置重试
+*指标
 
 ## Overview
 
-Core functionality is provided by `HermesClient` class, which in turn uses `HermesSender` to do the heavy lifting.
-At the moment there are three implementations of `HermesSender`:
+核心功能由`HermesClient`类提供，HermesClient使用`HermesSender`来完成繁重的工作。
+目前有三种`HermesSender`实现：
 
-* **RestTemplateHermesSender** - recommended for services built on [Spring framework](http://projects.spring.io/spring-framework);
-  uses [AsyncRestTemplate](http://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/web/client/AsyncRestTemplate.html)
-  for asynchronous transmission
-* **JerseyHermesSender** - recommended for services using  [Jersey](<https://jersey.java.net/>)
-* **OkHttpHermesSender** - supports both HTTP/1.1 and HTTP/2 protocols, uses [OkHttp3 client](http://square.github.io/okhttp/)
+* **RestTemplateHermesSender** - 建议基于 [Spring framework](http://projects.spring.io/spring-framework)构建的服务;
+  使用 [AsyncRestTemplate](http://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/web/client/AsyncRestTemplate.html)
+  进行异步传输
+* **JerseyHermesSender** - 建议使用  [Jersey](<https://jersey.java.net/>)
+* **OkHttpHermesSender** - 支持 both HTTP/1.1 and HTTP/2 协议, 使用 [OkHttp3 client](http://square.github.io/okhttp/)
 
 
 ## Creating
 
-To start using `HermesClient`, add it as an dependency:
+要开始使用`爱马仕客户端`，将其添加为依赖项：
 
 ```groovy
 compile group: 'pl.allegro.tech.hermes', name: 'hermes-client', version: versions.hermes
 ```
 
-Client should be always built using `HermesClientBuilder`, which allows on setting:
+客户端应该始终使用`HermesClientBuilder`构建，它允许设置：
 
 ```java
 HermesClient client = HermesClientBuilder.hermesClient(...)
@@ -42,21 +42,19 @@ HermesClient client = HermesClientBuilder.hermesClient(...)
     .build();
 ```
 
-See [Sender implementations](#sender-implementations) sections for guides on how to construct `HermesSender`.
+参阅 [Sender implementations](#sender-implementations) sections有关如何构建“HermesSender”的指南:
 
-Once created, you can start publishing messages. Hermes Client API is asynchronous by default, returning
-`CompletableFuture` object that holds the promise of a result.
+一旦创建，您就可以开始发布消息。 Hermes客户端API默认是异步的，返回包含结果承诺的`CompletableFuture`对象。
 
-`HermesClient` exposes methods for easy publication of JSON and Avro messages.
+`HermesClient`公开了容易发布JSON和Avro消息的方法。
 
-JSON sender sets `application/json` content type.
+JSON Sender设置`application / json`内容类型。
 
 ```java
 hermesClient.publishJSON("com.group.json", "{hello: 1}");
 ```
 
-Avro sender sets `avro/binary` content type. It also requires to pass Avro schema version of this message, which is
-passed on to Hermes in `Schema-Version` header.
+Avro sender sets `avro/binary` content type. It also requires to pass Avro schema version of this message, which is passed on to Hermes in `Schema-Version` header.
 
 ```java
 hermesClient.publishAvro("com.group.avro", 1, avroMessage.getBytes());

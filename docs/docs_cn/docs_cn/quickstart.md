@@ -4,7 +4,7 @@
 
 ## Prerequisities
 
-为了阅读本教程，您需要：:
+为了阅读本教程，您需要：
 
 * [Vagrant 1.7.3+](https://www.vagrantup.com/)
 * [VirtualBox](https://www.virtualbox.org/) (4.0.x, 4.1.x, 4.2.x, 4.3.x, 5.0.x)
